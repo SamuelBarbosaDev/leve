@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leve — Comprima imagens e vídeos sem enviar nada</title>
+  <meta name="description" content="Comprima imagens e vídeos diretamente no seu navegador. Rápido, privado e gratuito — nada é enviado para nenhum servidor." />
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <span class="logo">Leve</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Comprima imagens e vídeos.<br />Sem enviar nada.</h1>
+      <p class="subtitle">Tudo acontece no seu navegador. Seus arquivos nunca saem do seu dispositivo.</p>
+
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Selecionar arquivos para comprimir">
+        <input type="file" id="fileInput" multiple accept="image/jpeg,image/png,image/webp,image/gif,image/bmp,video/mp4,video/quicktime,video/webm,video/x-matroska" hidden />
+        <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+          <path d="M12 16V4M12 4L7.5 8.5M12 4l4.5 4.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <p class="dropzone-text"><strong>Arraste arquivos aqui</strong> ou clique para selecionar</p>
+        <p class="dropzone-hint">Imagens (JPEG, PNG, WebP) e vídeos (MP4, MOV, WebM)</p>
+      </div>
+    </section>
+
+    <section id="results" class="results" hidden></section>
+
+    <section class="features">
+      <div class="feature">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+          <rect x="5" y="11" width="14" height="9" rx="2" />
+          <path d="M8 11V7a4 4 0 118 0v4" />
+        </svg>
+        <h3>100% privado</h3>
+        <p>Nada é enviado para servidores. A compressão roda inteiramente no seu navegador.</p>
+      </div>
+      <div class="feature">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+          <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <h3>Rápido</h3>
+        <p>Resultados em segundos para imagens, sem filas e sem espera de upload.</p>
+      </div>
+      <div class="feature">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+          <path d="M6.5 16c-2.2 0-4-1.8-4-4s1.8-4 4-4c2.5 0 4.5 3.5 5.5 4 1-0.5 3-4 5.5-4 2.2 0 4 1.8 4 4s-1.8 4-4 4c-2.5 0-4.5-3.5-5.5-4-1 0.5-3 4-5.5 4z" stroke-linejoin="round" />
+        </svg>
+        <h3>Sem limites</h3>
+        <p>Comprima quantos arquivos quiser, de qualquer tamanho, gratuitamente.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Leve — feito para simplificar sua vida digital.</p>
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
