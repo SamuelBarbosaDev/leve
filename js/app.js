@@ -1,11 +1,60 @@
 import { compressImage } from "./imageCompressor.js";
 import { compressVideo } from "./videoCompressor.js";
+import { createZip } from "./zipDownloader.js";
 
 const dropzone = document.getElementById("dropzone");
 const fileInput = document.getElementById("fileInput");
 const resultsSection = document.getElementById("results");
+const resultsToolbar = document.getElementById("resultsToolbar");
+const toolbarInfo = resultsToolbar.querySelector('[data-role="toolbar-info"]');
+const downloadAllBtn = document.getElementById("downloadAllBtn");
 
 let cardCounter = 0;
+const zipEntries = new Map();
+
+function setZipEntry(id, entry) {
+  zipEntries.set(id, entry);
+  updateToolbar();
+}
+
+function clearZipEntry(id) {
+  zipEntries.delete(id);
+  updateToolbar();
+}
+
+function updateToolbar() {
+  const count = zipEntries.size;
+  if (count >= 2) {
+    resultsToolbar.hidden = false;
+    toolbarInfo.textContent = `${count} arquivos prontos para baixar`;
+  } else {
+    resultsToolbar.hidden = true;
+  }
+}
+
+downloadAllBtn.addEventListener("click", async () => {
+  const originalText = downloadAllBtn.textContent;
+  downloadAllBtn.disabled = true;
+  downloadAllBtn.textContent = "Compactando...";
+
+  try {
+    const zipBlob = await createZip(Array.from(zipEntries.values()));
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "leve-comprimidos.zip";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error(err);
+    alert("Erro ao gerar o arquivo .zip.");
+  } finally {
+    downloadAllBtn.disabled = false;
+    downloadAllBtn.textContent = originalText;
+  }
+});
 
 function formatBytes(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -117,18 +166,22 @@ function buildImageCard(file) {
 
       const ext = format === "jpeg" ? "jpg" : format;
       const baseName = file.name.replace(/\.[^.]+$/, "");
+      const downloadName = `${baseName}-comprimido.${ext}`;
 
       els.resultArea.innerHTML = `
         <div class="result-badge">${formatBytes(blob.size)} · ${savedPct > 0 ? `-${savedPct}%` : "sem redução"}</div>
         <div class="card-actions">
-          <a class="btn btn-primary" href="${currentBlobUrl}" download="${baseName}-comprimido.${ext}">Baixar</a>
+          <a class="btn btn-primary" href="${currentBlobUrl}" download="${downloadName}">Baixar</a>
         </div>
       `;
+
+      setZipEntry(id, { name: downloadName, blob });
     } catch (err) {
       console.error(err);
       els.status.hidden = false;
       els.status.classList.add("error");
       els.status.textContent = "Erro ao comprimir esta imagem.";
+      clearZipEntry(id);
     }
   }
 
@@ -143,6 +196,7 @@ function buildImageCard(file) {
   els.remove.addEventListener("click", () => {
     if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
     URL.revokeObjectURL(objectUrl);
+    clearZipEntry(id);
     card.remove();
   });
 
@@ -245,6 +299,7 @@ function buildVideoCard(file) {
       els.progressTrack.hidden = true;
 
       const baseName = file.name.replace(/\.[^.]+$/, "");
+      const downloadName = `${baseName}-comprimido.mp4`;
 
       els.resultArea.innerHTML = `
         <div class="result-badge">${formatBytes(blob.size)} · ${savedPct > 0 ? `-${savedPct}%` : "sem redução"}</div>
@@ -252,9 +307,11 @@ function buildVideoCard(file) {
       els.resultArea.querySelector(".result-badge").insertAdjacentHTML(
         "afterend",
         `<div class="card-actions">
-          <a class="btn btn-primary" href="${currentBlobUrl}" download="${baseName}-comprimido.mp4">Baixar</a>
+          <a class="btn btn-primary" href="${currentBlobUrl}" download="${downloadName}">Baixar</a>
         </div>`
       );
+
+      setZipEntry(id, { name: downloadName, blob });
 
       els.compress.textContent = "Comprimir novamente";
       els.compress.disabled = false;
@@ -264,12 +321,14 @@ function buildVideoCard(file) {
       els.status.textContent = "Erro ao comprimir este vídeo. Tente outro arquivo ou resolução.";
       els.progressTrack.hidden = true;
       els.compress.disabled = false;
+      clearZipEntry(id);
     }
   });
 
   els.remove.addEventListener("click", () => {
     if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
     URL.revokeObjectURL(objectUrl);
+    clearZipEntry(id);
     card.remove();
   });
 
