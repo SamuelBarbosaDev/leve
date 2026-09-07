@@ -43,14 +43,23 @@ Linux e confirmei, com testes de verdade:
 - o modo "tamanho alvo" gera um arquivo dentro do limite pedido;
 - redimensionamento (`-vf scale=-2:480`) e vídeo sem áudio funcionam sem erro.
 
-O que **não** deu para validar aqui: a compilação da casca do Tauri em si
-(janela nativa), porque faltam bibliotecas de sistema (WebKitGTK etc.) e este
-ambiente não tem acesso a `sudo` interativo para instalá-las. Ou seja: a
-"cola" entre o Rust e o Tauri (spawn do sidecar, eventos de progresso) foi
-escrita com cuidado seguindo a API documentada do Tauri v2, mas o primeiro
-build de verdade é que vai confirmar se compila sem ajuste. Isso é normal
-para este tipo de projeto — só peço que rode o primeiro build e me avise se
-aparecer erro de compilação para eu corrigir.
+**Atualização**: depois que as bibliotecas de sistema foram instaladas nesta
+máquina, `cargo check` e `cargo test` passam limpos (`leve-desktop` compila
+por inteiro, incluindo a cola com o Tauri — spawn do sidecar, eventos de
+progresso — e os 5 testes unitários de `ffmpeg.rs` passam). E o app rodou de
+verdade via `cargo tauri dev`, comprimindo um vídeo real com sucesso.
+
+Um bug real apareceu no caminho, só que fora do meu código: o seletor de
+arquivo (`pick_video_files`, via crate `rfd`) ficava sem reação nenhuma ao
+clicar. Isolei com `gdbus call` direto no `org.freedesktop.portal.FileChooser`
+(sem passar pelo app) e confirmei que o `xdg-desktop-portal-gnome` desta
+máquina falha ao delegar o FileChooser ("Message recipient disconnected from
+message bus without replying") — um problema no portal do GNOME, não no rfd
+nem no Tauri. Troquei a configuração do `rfd` em
+[Cargo.toml](src-tauri/Cargo.toml) pra usar o diálogo nativo do GTK3
+diretamente (`default-features = false, features = ["gtk3"]`) em vez do
+caminho via portal/D-Bus — como o Tauri já roda GTK de qualquer forma no
+Linux, isso contorna o portal quebrado por completo.
 
 ## Build local no Linux (você)
 
