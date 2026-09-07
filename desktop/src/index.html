@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leve Desktop — Compressor de vídeo</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <span class="logo">Leve Desktop</span>
+      <span class="encoder-badge" id="encoderBadge">Detectando motor de vídeo...</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Comprima vídeos para o limite da Shopee.</h1>
+      <p class="subtitle">Usa o hardware do seu computador para comprimir muito mais rápido. Nada sai da sua máquina.</p>
+    </section>
+
+    <div class="output-bar">
+      <div>
+        <p class="output-bar-label">Pasta de destino</p>
+        <p class="output-bar-path" id="outputPath">Padrão: salva ao lado de cada vídeo original</p>
+      </div>
+      <button class="btn btn-secondary" type="button" id="chooseOutputBtn">Escolher pasta…</button>
+    </div>
+
+    <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Selecionar vídeos para comprimir">
+      <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M12 16V4M12 4L7.5 8.5M12 4l4.5 4.5" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <p class="dropzone-text"><strong>Arraste vídeos aqui</strong> ou clique para selecionar</p>
+      <p class="dropzone-hint">MP4, MOV, WebM, MKV, AVI</p>
+    </div>
+
+    <section id="results" class="results" hidden></section>
+  </main>
+
+  <footer class="footer">
+    <p>Leve Desktop — ferramenta interna, não distribuída ao público.</p>
+  </footer>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
