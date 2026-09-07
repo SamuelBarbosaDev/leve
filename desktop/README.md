@@ -92,15 +92,20 @@ Linux não é confiável o suficiente para isso.
 **Opção recomendada: GitHub Actions** (não precisa de máquina Windows).
 Já existe o workflow em
 [.github/workflows/desktop-build.yml](../.github/workflows/desktop-build.yml):
-dá um `git push` de uma tag `desktop-v1` (ou dispare manualmente pela aba
-Actions → "Build Leve Desktop" → Run workflow) e ele builda Windows e Linux
-em paralelo, deixando o `.exe` e o `.AppImage`/`.deb` como artefacts do run
-para baixar.
+dá um `git push` de uma tag `desktop-v1` e ele builda Windows e Linux em
+paralelo e publica um **Release** (como rascunho — "Publish release" na
+página do Release quando quiser liberar) com o `.exe` e o `.AppImage`/`.deb`
+já anexados. Isso dá um link permanente pra galera do escritório baixar,
+em vez de um artifact do Actions que expira em 90 dias.
 
 ```bash
 git tag desktop-v1
 git push origin desktop-v1
 ```
+
+Disparar pela aba Actions → "Build Leve Desktop" → Run workflow (sem tag)
+também funciona, mas nesse caso fica só como artifact temporário do run —
+útil pra testar rápido sem criar um Release novo a cada tentativa.
 
 Alternativa: pedir pra alguém com Windows rodar os mesmos três comandos do
 build local (Rust + Node + `fetch-ffmpeg.mjs` + `cargo tauri build`), sem

@@ -142,6 +142,7 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 
-# Leve Desktop (Tauri) — Rust build output and downloaded FFmpeg sidecars
+# Leve Desktop (Tauri) — Rust build output, downloaded FFmpeg sidecars, generated schemas
 desktop/src-tauri/target/
 desktop/src-tauri/binaries/
+desktop/src-tauri/gen/
