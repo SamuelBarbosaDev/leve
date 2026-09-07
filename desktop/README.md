@@ -2,69 +2,65 @@
 
 App desktop interno (Windows + Linux) para comprimir vídeo usando o FFmpeg
 nativo do computador, com aceleração de hardware (NVENC/QuickSync/AMF/VA-API)
-quando disponível. Feito para quem sobe vídeo na Shopee e esbarra no limite de
-tamanho da plataforma — o modo padrão comprime para um tamanho-alvo em MB em
-vez de só uma predefinição de qualidade.
+quando disponível. Feito para quem sobe vídeo na Shopee e esbarra no limite
+de tamanho da plataforma — o modo padrão comprime para um tamanho-alvo em MB
+em vez de só uma predefinição de qualidade.
 
-Não é vendido nem distribuído publicamente — uso interno do escritório.
+> Não é vendido nem distribuído publicamente — uso interno do escritório.
+
+## Índice
+
+- [Como funciona](#como-funciona)
+- [Requisitos](#requisitos)
+- [Desenvolvimento](#desenvolvimento)
+- [Gerando um build](#gerando-um-build)
+- [Configuração](#configuração)
+- [Solução de problemas](#solução-de-problemas)
+- [Estrutura do projeto](#estrutura-do-projeto)
 
 ## Como funciona
 
-- UI: HTML/CSS/JS puro (sem bundler), igual em espírito ao site
-  [leve](../index.html) — vive em [src/](src/).
-- Motor: Rust + [Tauri v2](https://tauri.app), em [src-tauri/](src-tauri/).
-- Compressão: o Rust chama um binário real de `ffmpeg`/`ffprobe` (não é
-  ffmpeg.wasm) empacotado como "sidecar" do Tauri. Ao abrir o app, ele testa
-  (de verdade, com uma codificação de 1 frame) qual encoder de hardware
-  funciona nesta máquina — `h264_nvenc` → `h264_qsv` → `h264_amf` no Windows,
-  `h264_nvenc` → `h264_vaapi` no Linux — e cai para `libx264` (CPU) se nenhum
-  funcionar. Isso importa porque um encoder pode aparecer disponível no
-  `ffmpeg -encoders` e mesmo assim falhar em tempo real por driver
-  desatualizado ou falta de GPU compatível.
-- Dois modos de compressão por vídeo:
-  - **Tamanho alvo (padrão)**: você diz "até 30 MB" e o app calcula o bitrate
-    necessário pela duração do vídeo (com ~2% de margem para o container).
-  - **Qualidade**: os mesmos presets Alta/Média/Baixa do site, via CRF (ou o
-    equivalente de cada encoder de hardware).
-- Sem upload de arquivo pela UI: os arquivos comprimidos são salvos direto no
-  disco (pasta escolhida ou, por padrão, a mesma pasta do vídeo original) —
-  não existe a etapa de "baixar" do navegador porque o app já tem acesso real
-  ao sistema de arquivos.
+- **UI**: HTML/CSS/JS puro, sem bundler — vive em [src/](src/) e é
+  praticamente a mesma interface do [site](../index.html), adaptada ao
+  contexto nativo (sem "baixar", os arquivos são salvos direto no disco).
+- **Motor**: Rust + [Tauri v2](https://tauri.app), em [src-tauri/](src-tauri/).
+- **Compressão**: o Rust chama um binário real de `ffmpeg`/`ffprobe`
+  (não é o ffmpeg.wasm do site) empacotado como *sidecar* do Tauri.
 
-## O que foi validado e o que não
+### Detecção de encoder de hardware
 
-Rodei o binário FFmpeg real (baixado do mesmo lugar que o app vai usar) neste
-Linux e confirmei, com testes de verdade:
-- a lógica de probe de encoder cai corretamente para `libx264` quando NVENC
-  tem driver desatualizado e VA-API falha ao inicializar — que é exatamente o
-  que acontece nesta máquina agora;
-- o parsing do progresso (`-progress pipe:1`, campo `out_time=`) bate com o
-  formato real do FFmpeg;
-- o modo "tamanho alvo" gera um arquivo dentro do limite pedido;
-- redimensionamento (`-vf scale=-2:480`) e vídeo sem áudio funcionam sem erro.
+Ao iniciar, o app testa — de verdade, com uma codificação de 1 frame — qual
+encoder funciona nesta máquina, na ordem:
 
-**Atualização**: depois que as bibliotecas de sistema foram instaladas nesta
-máquina, `cargo check` e `cargo test` passam limpos (`leve-desktop` compila
-por inteiro, incluindo a cola com o Tauri — spawn do sidecar, eventos de
-progresso — e os 5 testes unitários de `ffmpeg.rs` passam). E o app rodou de
-verdade via `cargo tauri dev`, comprimindo um vídeo real com sucesso.
+- **Windows**: `h264_nvenc` → `h264_qsv` → `h264_amf` → `libx264` (CPU)
+- **Linux**: `h264_nvenc` → `h264_vaapi` → `libx264` (CPU)
 
-Um bug real apareceu no caminho, só que fora do meu código: o seletor de
-arquivo (`pick_video_files`, via crate `rfd`) ficava sem reação nenhuma ao
-clicar. Isolei com `gdbus call` direto no `org.freedesktop.portal.FileChooser`
-(sem passar pelo app) e confirmei que o `xdg-desktop-portal-gnome` desta
-máquina falha ao delegar o FileChooser ("Message recipient disconnected from
-message bus without replying") — um problema no portal do GNOME, não no rfd
-nem no Tauri. Troquei a configuração do `rfd` em
-[Cargo.toml](src-tauri/Cargo.toml) pra usar o diálogo nativo do GTK3
-diretamente (`default-features = false, features = ["gtk3"]`) em vez do
-caminho via portal/D-Bus — como o Tauri já roda GTK de qualquer forma no
-Linux, isso contorna o portal quebrado por completo.
+Isso importa porque um encoder pode aparecer disponível em `ffmpeg -encoders`
+e mesmo assim falhar em tempo real (driver desatualizado, sem GPU compatível
+etc.) — só confiar na lista do FFmpeg não é suficiente. A lógica está em
+[`src-tauri/src/ffmpeg.rs`](src-tauri/src/ffmpeg.rs), função
+`detect_best_encoder`.
 
-## Build local no Linux (você)
+### Modos de compressão
 
-Instale as dependências de sistema uma vez (precisa de sudo — rode você
-mesmo, isso eu não consigo fazer por aqui):
+Cada vídeo escolhe um dos dois modos (mutuamente exclusivos — nunca somados):
+
+- **Tamanho alvo** (padrão): você define um limite em MB e o app calcula o
+  bitrate necessário a partir da duração do vídeo (com ~2% de margem para o
+  container). Pensado para caber em limites de upload como o da Shopee.
+- **Qualidade**: presets Alta/Média/Baixa via CRF (ou o equivalente de cada
+  encoder de hardware — `-cq` no NVENC, `-global_quality` no QSV, etc).
+
+Nos dois modos, dá pra também redimensionar (Original/1080p/720p/480p).
+
+## Requisitos
+
+| | Windows | Linux |
+|---|---|---|
+| Para **usar** o app já instalado | Nada além do próprio instalador | Nada além do pacote (`.deb`/`.AppImage`) |
+| Para **compilar** | Rust + [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022) (WebView2 já vem com Windows 10/11 atualizado) | Rust + Node + bibliotecas de sistema (abaixo) |
+
+Bibliotecas de sistema para compilar no Linux (Ubuntu/Debian):
 
 ```bash
 sudo apt-get update
@@ -82,65 +78,155 @@ sudo apt-get install -y \
   build-essential
 ```
 
-Depois:
+## Desenvolvimento
 
 ```bash
 cd desktop
-node scripts/fetch-ffmpeg.mjs        # baixa ffmpeg/ffprobe para src-tauri/binaries/
-cargo install tauri-cli --locked --version "^2.0.0"   # só na primeira vez
-cargo tauri dev                      # roda em modo desenvolvimento
-cargo tauri build                    # gera o pacote final (.AppImage/.deb)
+node scripts/fetch-ffmpeg.mjs                          # baixa ffmpeg/ffprobe para src-tauri/binaries/
+cargo install tauri-cli --locked --version "^2.0.0"     # só na primeira vez
+cargo tauri dev
 ```
 
-## Gerar o instalador Windows (.exe)
+`cargo tauri dev` recompila só o que mudou e serve o frontend
+(`src/`) direto do disco — editar HTML/CSS/JS e apertar salvar já reflete na
+próxima janela, sem precisar rebuildar o Rust.
 
-Ninguém no escritório usa Linux além de você, então o `.exe` para o time
-precisa ser gerado no Windows ou via CI — cross-compilar Windows a partir do
-Linux não é confiável o suficiente para isso.
-
-**Opção recomendada: GitHub Actions** (não precisa de máquina Windows).
-Já existe o workflow em
-[.github/workflows/desktop-build.yml](../.github/workflows/desktop-build.yml):
-dá um `git push` de uma tag `desktop-v1` e ele builda Windows e Linux em
-paralelo e publica um **Release** (como rascunho — "Publish release" na
-página do Release quando quiser liberar) com o `.exe` e o `.AppImage`/`.deb`
-já anexados. Isso dá um link permanente pra galera do escritório baixar,
-em vez de um artifact do Actions que expira em 90 dias.
+Rodar os testes unitários (cálculo de bitrate, parsing de progresso do
+FFmpeg, montagem de argumentos):
 
 ```bash
-git tag desktop-v1
-git push origin desktop-v1
+cargo test
 ```
 
-Disparar pela aba Actions → "Build Leve Desktop" → Run workflow (sem tag)
-também funciona, mas nesse caso fica só como artifact temporário do run —
-útil pra testar rápido sem criar um Release novo a cada tentativa.
+## Gerando um build
 
-Alternativa: pedir pra alguém com Windows rodar os mesmos três comandos do
-build local (Rust + Node + `fetch-ffmpeg.mjs` + `cargo tauri build`), sem
-precisar instalar nada de sistema além do Visual Studio Build Tools (o
-WebView2 runtime já vem com o Windows 10/11 atualizado).
+### Windows (.exe)
 
-## Tamanho do instalador
+Ninguém no escritório usa Linux além de quem mantém o projeto, então o
+`.exe` para o time precisa vir do Windows ou da CI — cross-compilar Windows
+a partir do Linux não é confiável o suficiente.
 
-O FFmpeg estático "full" (BtbN, build GPL) usado como sidecar tem ~140 MB
-*cada* (ffmpeg + ffprobe), então o instalador final fica em torno de
-**280–300 MB** — bem mais que os poucos MB que um app Tauri "puro" teria, mas
-ainda assim uma fração do que um Electron equivalente pesaria. Se isso virar
-problema, dá pra compilar uma build customizada do FFmpeg só com os codecs
-que a Shopee realmente aceita (H.264/AAC) e cortar bastante esse tamanho —
-não fiz isso agora para não gastar tempo otimizando algo que talvez nem
-importe no uso real.
+**Via GitHub Actions (recomendado, não precisa de máquina Windows):** dar
+push numa tag `desktop-vN` builda Windows e Linux em paralelo e publica um
+**Release rascunho** com os instaladores já anexados — link permanente,
+diferente de um artifact do Actions (que expira em 90 dias).
 
-## Licenciamento do FFmpeg
+```bash
+git tag desktop-v4
+git push origin desktop-v4
+```
 
-O binário baixado é a build "gpl" da BtbN (inclui libx264). Isso é aceitável
-porque o app **não é distribuído/vendido** — é uso interno da empresa. Se um
-dia isso mudar (vender, distribuir fora da empresa), revisar para uma build
-LGPL antes.
+Depois, entrar em `Releases` no GitHub, conferir os arquivos e clicar em
+"Publish release" quando quiser liberar pro time.
 
-## Onde mexer
+Disparar manualmente pela aba **Actions → "Build Leve Desktop" → Run
+workflow** (sem criar tag) também builda, mas fica só como artifact
+temporário — útil pra testar sem gerar um Release a cada tentativa.
 
-- Limite padrão de 30 MB e opções de resolução: [src/js/app.js](src/js/app.js).
-- Cálculo de bitrate / flags de cada encoder: [src-tauri/src/ffmpeg.rs](src-tauri/src/ffmpeg.rs).
-- Comandos expostos à UI (compress, escolher pasta, abrir pasta): [src-tauri/src/commands.rs](src-tauri/src/commands.rs).
+**Alternativa manual**: alguém com Windows roda os mesmos comandos da seção
+[Desenvolvimento](#desenvolvimento), trocando `cargo tauri dev` por
+`cargo tauri build`. Não precisa instalar nada de sistema além do Visual
+Studio Build Tools.
+
+### Linux
+
+```bash
+cd desktop
+cargo tauri build
+```
+
+Gera `.AppImage` e `.deb` em
+`src-tauri/target/release/bundle/{appimage,deb}/`.
+
+### Tamanho do instalador
+
+O FFmpeg estático "full" (build GPL da [BtbN](https://github.com/BtbN/FFmpeg-Builds))
+usado como sidecar tem ~140 MB *cada* (ffmpeg + ffprobe), então o instalador
+final fica em torno de **280–300 MB** — bem mais que os poucos MB de um app
+Tauri "puro", mas ainda uma fração do que um Electron equivalente pesaria.
+Se isso virar problema, uma build customizada do FFmpeg só com os codecs que
+a Shopee aceita (H.264/AAC) cortaria bastante esse tamanho.
+
+### Licenciamento do FFmpeg
+
+O binário baixado é a build "gpl" da BtbN (inclui libx264). Aceitável porque
+o app não é distribuído/vendido — uso interno. Se isso mudar (vender,
+distribuir fora da empresa), trocar para uma build LGPL antes.
+
+## Configuração
+
+| O que mexer | Onde |
+|---|---|
+| Valor padrão do campo "Tamanho alvo" e opções de resolução | [src/js/app.js](src/js/app.js) |
+| Cálculo de bitrate e flags de rate-control por encoder | [src-tauri/src/ffmpeg.rs](src-tauri/src/ffmpeg.rs) |
+| Comandos expostos à UI (comprimir, escolher pasta, abrir pasta) | [src-tauri/src/commands.rs](src-tauri/src/commands.rs) |
+| Ícones do app | [src-tauri/icons/](src-tauri/icons/) |
+| Bundle/targets/permissões | [src-tauri/tauri.conf.json](src-tauri/tauri.conf.json), [src-tauri/capabilities/](src-tauri/capabilities/) |
+
+## Solução de problemas
+
+### Seletor de arquivo/pasta não abre nada ao clicar (Linux)
+
+Sintoma: clicar em "Arraste vídeos aqui" ou "Escolher pasta..." não faz
+nada, sem erro visível.
+
+Causa confirmada num caso real: o `xdg-desktop-portal-gnome` da máquina
+falha ao delegar a chamada `org.freedesktop.portal.FileChooser`
+(`Message recipient disconnected from message bus without replying`) — um
+bug no portal do GNOME, não no app. Reproduzível isoladamente com:
+
+```bash
+gdbus call --session --dest org.freedesktop.portal.Desktop \
+  --object-path /org/freedesktop/portal/desktop \
+  --method org.freedesktop.portal.FileChooser.OpenFile "" "teste" "{}"
+```
+
+Se isso já falhar sem o app aberto, é confirmadamente um problema do
+ambiente, não do Leve Desktop. **Correção já aplicada** no projeto: o `rfd`
+(crate usada pelos diálogos) está configurado para usar o GTK3 nativo
+diretamente (`default-features = false, features = ["gtk3"]` em
+[Cargo.toml](src-tauri/Cargo.toml)), contornando o portal por completo — se
+você vir esse sintoma numa build antiga, atualize.
+
+### App detecta só "CPU (software)" com uma GPU NVIDIA presente
+
+O FFmpeg baixado é uma build recente cujo NVENC exige um driver NVIDIA
+mínimo relativamente novo (`>= 610.00`). Se o driver instalado for mais
+antigo, o probe de encoder falha o teste real (mesmo o encoder aparecendo
+disponível) e cai pra CPU corretamente. Verifique a versão instalada:
+
+```bash
+nvidia-smi   # olhe "Driver Version"
+```
+
+No Ubuntu, atualizar costuma ser um `apt install nvidia-driver-<versão>-open`
+(confira com `ubuntu-drivers devices` quais estão disponíveis) seguido de
+reboot — o módulo de kernel só troca depois de reiniciar.
+
+### VA-API falha ao inicializar numa GPU AMD/Intel integrada
+
+Precisa do driver VA-API correspondente instalado (`mesa-va-drivers` ou
+equivalente, o nome do pacote varia por distro/versão). Sem ele, o probe
+falha o teste real e cai pra `libx264` (CPU) — comportamento esperado, não
+trava nada.
+
+## Estrutura do projeto
+
+```text
+desktop/
+├── scripts/
+│   └── fetch-ffmpeg.mjs      Baixa ffmpeg/ffprobe (BtbN) para src-tauri/binaries/
+├── src/                      Frontend (HTML/CSS/JS puro, sem bundler)
+│   ├── index.html
+│   ├── css/styles.css
+│   └── js/app.js
+└── src-tauri/                Backend Rust + config do Tauri
+    ├── src/
+    │   ├── main.rs           Registro de plugins e comandos
+    │   ├── commands.rs       Comandos expostos à UI (compress_video, pick_*, reveal_in_folder)
+    │   └── ffmpeg.rs         Detecção de encoder, cálculo de bitrate, montagem de args
+    ├── capabilities/         Permissões da janela (ACL do Tauri v2)
+    ├── icons/
+    ├── binaries/             ffmpeg/ffprobe baixados (gitignored, gerado pelo fetch script)
+    └── tauri.conf.json
+```
